@@ -77,6 +77,14 @@ const getSizeFromAspectRatio = (aspectRatio: string): "1024x1024" | "1536x1024" 
 
 export async function POST(request: NextRequest) {
   try {
+    // 调试：检查请求头和域名信息
+    console.log("📡 API请求调试信息:");
+    console.log("  - req.headers.host:", request.headers.get('host'));
+    console.log("  - req.headers.origin:", request.headers.get('origin'));
+    console.log("  - req.headers.referer:", request.headers.get('referer'));
+    console.log("  - req.nextUrl.origin:", request.nextUrl.origin);
+    console.log("  - req.nextUrl.hostname:", request.nextUrl.hostname);
+    
     // 检查并获取请求体中的数据
     const { prompt, aspectRatio = "1:1", quality = "standard", input_image } = await request.json()
 

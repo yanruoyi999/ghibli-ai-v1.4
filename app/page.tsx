@@ -51,6 +51,13 @@ export default function GhibliAI() {
   ]
 
   useEffect(() => {
+    // 调试：检查当前域名和环境
+    console.log("🌐 当前域名信息:");
+    console.log("  - window.location.origin:", window.location.origin);
+    console.log("  - window.location.hostname:", window.location.hostname);
+    console.log("  - window.location.protocol:", window.location.protocol);
+    console.log("  - process.env.NODE_ENV:", process.env.NODE_ENV);
+    
     try {
       const savedHistoryJson = localStorage.getItem("ghibli-ai-history");
       console.log("从 localStorage 读取的原始数据:", savedHistoryJson);
@@ -62,14 +69,15 @@ export default function GhibliAI() {
           .map((item: any): GeneratedImage => ({
             ...item,
             type: item.type || 'text-to-image' // 为旧数据提供默认值
-          }));
+          }))
+          .slice(0, 20);
         console.log("验证后的历史数据:", validatedHistory);
         setHistory(validatedHistory);
       }
     } catch (error) {
-      console.error("Failed to parse history from localStorage", error);
+      console.error("读取历史记录时出错:", error);
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
     console.log("history 状态更新:", history);
@@ -199,7 +207,11 @@ export default function GhibliAI() {
       setGenerationStatus("图片已发送，请求正在进行处理...")
       console.log("🌐 发送API请求...", requestBody);
       
-      const response = await fetch("/api/generate", {
+      // 使用绝对路径确保在自定义域名下正确解析
+      const apiUrl = `${window.location.origin}/api/generate`;
+      console.log("🔗 API请求URL:", apiUrl);
+      
+      const response = await fetch(apiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
