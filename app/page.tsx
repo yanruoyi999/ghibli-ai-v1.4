@@ -152,6 +152,9 @@ export default function GhibliAI() {
     setGenerationStatus("准备开始...")
     
     const finalPrompt = (prompt || "").trim() || "a peaceful countryside scene with rolling hills and gentle breeze";
+    
+    console.log("🔍 调试信息 - prompt:", prompt);
+    console.log("🔍 调试信息 - finalPrompt:", finalPrompt);
 
     let currentProgress = 5
     setProgress(currentProgress)
