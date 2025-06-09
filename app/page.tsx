@@ -210,10 +210,13 @@ export default function GhibliAI() {
         console.log("🖼️ 提取的图片URL:", imageUrl);
         
         if (imageUrl) {
+          console.log("🔍 创建图片对象前 - finalPrompt:", finalPrompt);
+          console.log("🔍 创建图片对象前 - typeof finalPrompt:", typeof finalPrompt);
+          
           const newImage: GeneratedImage = {
             id: Date.now().toString(),
             url: imageUrl,
-            prompt: finalPrompt,
+            prompt: finalPrompt || "Generated image",
             aspectRatio,
             timestamp: Date.now(),
             type: referenceImage ? 'image-to-image' : 'text-to-image',
