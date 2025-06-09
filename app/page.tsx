@@ -174,32 +174,40 @@ export default function GhibliAI() {
     const progressInterval = setInterval(() => {
       setProgress((prev) => {
         if (prev < 85) {
-          const increment = Math.random() * 6 + 2
-          const newProgress = Math.min(prev + increment, 85)
-          return newProgress
+          const increment = Math.random() * 10 + 5
+          return Math.min(prev + increment, 85)
         }
         return prev
       })
-    }, 300)
+    }, 500)
 
     try {
       const startTime = Date.now()
-      console.log("⏰ 开始时间:", new Date(startTime).toLocaleTimeString());
+      console.log("⏰ 开始时间:", new Date(startTime).toISOString());
       
-      let requestBody: any = {
-          prompt: finalPrompt,
-          aspectRatio,
-      };
+      const requestBody: any = {
+        prompt: finalPrompt,
+        aspectRatio,
+        quality: "standard"
+      }
 
       if (referenceImage) {
-        setGenerationStatus("正在上传您的图片...")
-        console.log("📸 开始处理参考图片...");
-        const reader = new FileReader();
-        const base64Image = await new Promise<string>((resolve, reject) => {
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = (error) => reject(error);
-          reader.readAsDataURL(referenceImage);
+        console.log("🔍 处理参考图片...");
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = previewUrl!;
         });
+
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx!.drawImage(img, 0, 0);
+        
+        const base64Image = canvas.toDataURL('image/jpeg', 0.9);
         requestBody.input_image = base64Image;
         console.log("✅ 参考图片处理完成");
       }
@@ -207,9 +215,16 @@ export default function GhibliAI() {
       setGenerationStatus("图片已发送，请求正在进行处理...")
       console.log("🌐 发送API请求...", requestBody);
       
-      // 使用绝对路径确保在自定义域名下正确解析
-      const apiUrl = `${window.location.origin}/api/generate`;
+      // 🧪 测试模式：检查是否在自定义域名上，如果是则使用测试API
+      const isCustomDomain = window.location.hostname !== 'localhost' && !window.location.hostname.includes('vercel.app');
+      const isTestMode = isCustomDomain && (prompt || "").toLowerCase().includes('test');
+      
+      const apiEndpoint = isTestMode ? '/api/test-generate' : '/api/generate';
+      const apiUrl = `${window.location.origin}${apiEndpoint}`;
+      
       console.log("🔗 API请求URL:", apiUrl);
+      console.log("🧪 测试模式:", isTestMode ? "开启" : "关闭");
+      console.log("🌐 当前域名:", window.location.hostname);
       
       const response = await fetch(apiUrl, {
         method: "POST",
