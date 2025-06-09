@@ -248,17 +248,6 @@ export default function GhibliAI() {
             console.log("📝 更新后的历史记录数量:", newHistory.length);
             console.log("📝 新历史记录:", newHistory);
             
-            try {
-              localStorage.setItem("ghibli-ai-history", JSON.stringify(newHistory));
-              console.log("💾 成功保存到localStorage");
-              
-              // 验证保存
-              const saved = localStorage.getItem("ghibli-ai-history");
-              console.log("🔍 验证localStorage保存:", saved ? "成功" : "失败");
-            } catch (storageError) {
-              console.error("❌ localStorage保存失败:", storageError);
-            }
-            
             return newHistory;
           });
           
