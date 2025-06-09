@@ -142,7 +142,7 @@ export default function GhibliAI() {
   }
 
   const generateImage = async () => {
-    if (!prompt.trim() && !referenceImage) {
+    if (!(prompt || "").trim() && !referenceImage) {
       alert("请输入场景描述或上传一张参考图片")
       return
     }
@@ -151,7 +151,7 @@ export default function GhibliAI() {
     setProgress(0)
     setGenerationStatus("准备开始...")
     
-    const finalPrompt = prompt.trim() || "a peaceful countryside scene with rolling hills and gentle breeze";
+    const finalPrompt = (prompt || "").trim() || "a peaceful countryside scene with rolling hills and gentle breeze";
 
     let currentProgress = 5
     setProgress(currentProgress)
