@@ -312,7 +312,40 @@ export async function POST(request: NextRequest) {
         body: raw
       }
 
-      const response = await fetch("https://ismaque.org/v1/images/generations", requestOptions)
+             // 重试机制
+       let response: Response | undefined;
+       let lastError: Error | undefined;
+       const maxRetries = 3;
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`🔄 尝试第 ${attempt}/${maxRetries} 次调用 ismaque.org API...`);
+          
+          response = await fetch("https://ismaque.org/v1/images/generations", {
+            ...requestOptions,
+            signal: AbortSignal.timeout(30000) // 30秒超时
+          });
+          
+          // 如果请求成功，跳出重试循环
+          break;
+          
+        } catch (error: any) {
+          lastError = error;
+          console.error(`❌ 第 ${attempt} 次尝试失败:`, error.message);
+          
+          if (attempt < maxRetries) {
+            const waitTime = attempt * 2000; // 递增等待时间：2s, 4s
+            console.log(`⏳ 等待 ${waitTime/1000}s 后重试...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
+        }
+      }
+      
+                    // 如果所有重试都失败了
+        if (!response) {
+           console.error("❌ 所有重试尝试都失败了");
+          throw new Error(`API连接失败，已重试${maxRetries}次: ${lastError?.message || '未知错误'}`);
+         }
 
       const requestTime = Date.now() - startTime
       console.log(`⏱️ ismaque.org API请求耗时: ${requestTime}ms`)
