@@ -218,13 +218,27 @@ export default function GhibliAI() {
       })
 
       console.log("📡 API响应状态:", response.status, response.statusText);
+      console.log("📡 API响应头:", Object.fromEntries(response.headers.entries()));
+      
+      // 先获取响应文本，以便调试
+      const responseText = await response.text();
+      console.log("📄 API原始响应文本 (前200字符):", responseText.substring(0, 200));
       
       if (!response.ok) {
-        throw new Error(`HTTP错误! 状态: ${response.status}`);
+        console.error("❌ API响应失败:", responseText);
+        throw new Error(`HTTP错误! 状态: ${response.status} - ${responseText.substring(0, 100)}`);
       }
 
-      const data = await response.json()
-      console.log("📋 API响应数据:", JSON.stringify(data, null, 2));
+      // 尝试解析JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log("📋 API响应数据:", JSON.stringify(data, null, 2));
+      } catch (parseError) {
+        console.error("❌ JSON解析失败:", parseError);
+        console.error("📄 完整响应内容:", responseText);
+        throw new Error(`API返回格式错误: ${responseText.substring(0, 100)}...`);
+      }
 
       if (data.success) {
         setGenerationStatus("生成成功！")
