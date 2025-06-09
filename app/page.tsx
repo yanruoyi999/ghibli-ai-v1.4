@@ -142,6 +142,8 @@ export default function GhibliAI() {
   }
 
   const generateImage = async () => {
+    console.log("🚀 开始生成图片流程...");
+    
     if (!(prompt || "").trim() && !referenceImage) {
       alert("请输入场景描述或上传一张参考图片")
       return
@@ -155,6 +157,8 @@ export default function GhibliAI() {
     
     console.log("🔍 调试信息 - prompt:", prompt);
     console.log("🔍 调试信息 - finalPrompt:", finalPrompt);
+    console.log("🔍 调试信息 - referenceImage:", referenceImage ? "有图片" : "无图片");
+    console.log("🔍 调试信息 - aspectRatio:", aspectRatio);
 
     let currentProgress = 5
     setProgress(currentProgress)
@@ -172,6 +176,7 @@ export default function GhibliAI() {
 
     try {
       const startTime = Date.now()
+      console.log("⏰ 开始时间:", new Date(startTime).toLocaleTimeString());
       
       let requestBody: any = {
           prompt: finalPrompt,
@@ -180,6 +185,7 @@ export default function GhibliAI() {
 
       if (referenceImage) {
         setGenerationStatus("正在上传您的图片...")
+        console.log("📸 开始处理参考图片...");
         const reader = new FileReader();
         const base64Image = await new Promise<string>((resolve, reject) => {
           reader.onload = () => resolve(reader.result as string);
@@ -187,16 +193,26 @@ export default function GhibliAI() {
           reader.readAsDataURL(referenceImage);
         });
         requestBody.input_image = base64Image;
+        console.log("✅ 参考图片处理完成");
       }
 
       setGenerationStatus("图片已发送，请求正在进行处理...")
+      console.log("🌐 发送API请求...", requestBody);
+      
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
       })
 
+      console.log("📡 API响应状态:", response.status, response.statusText);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP错误! 状态: ${response.status}`);
+      }
+
       const data = await response.json()
+      console.log("📋 API响应数据:", JSON.stringify(data, null, 2));
 
       if (data.success) {
         setGenerationStatus("生成成功！")
@@ -223,24 +239,44 @@ export default function GhibliAI() {
           };
           
           console.log("✅ 创建的新图片对象:", newImage);
+          console.log("💾 准备保存到历史记录...");
+          
           setCurrentImage(newImage);
           setHistory((prevHistory) => {
+            console.log("📚 当前历史记录数量:", prevHistory.length);
             const newHistory = [newImage, ...prevHistory].slice(0, 20);
-            console.log("📝 更新后的历史记录:", newHistory);
-            localStorage.setItem("ghibli-ai-history", JSON.stringify(newHistory));
+            console.log("📝 更新后的历史记录数量:", newHistory.length);
+            console.log("📝 新历史记录:", newHistory);
+            
+            try {
+              localStorage.setItem("ghibli-ai-history", JSON.stringify(newHistory));
+              console.log("💾 成功保存到localStorage");
+              
+              // 验证保存
+              const saved = localStorage.getItem("ghibli-ai-history");
+              console.log("🔍 验证localStorage保存:", saved ? "成功" : "失败");
+            } catch (storageError) {
+              console.error("❌ localStorage保存失败:", storageError);
+            }
+            
             return newHistory;
           });
+          
+          console.log("🎉 图片生成和保存流程完成!");
         } else {
           console.error("❌ 生成的图片没有有效的 URL，完整响应:", data);
+          throw new Error("生成的图片没有有效的URL");
         }
 
         setTimeout(() => setGenerationStatus("✅ 生成完成！"), 500)
       } else {
         const errorMsg = `生成失败: ${data.message || '未知错误'}`
+        console.error("❌ API返回失败:", data);
         setGenerationStatus(errorMsg)
         throw new Error(data.error || data.details || "生成失败")
       }
     } catch (error) {
+      console.error("💥 生成过程发生错误:", error);
       const errorMessage = error instanceof Error ? error.message : '生成失败，请稍后重试'
       setGenerationStatus(`生成失败: ${errorMessage}`)
       setProgress(0)
@@ -253,6 +289,7 @@ export default function GhibliAI() {
             setGenerationStatus("");
         }
       }, 3000)
+      console.log("🏁 生成流程结束");
     }
   }
 
