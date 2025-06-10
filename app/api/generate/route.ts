@@ -41,10 +41,20 @@ async function uploadImageToR2(base64Data: string, imageType: 'uploaded' | 'gene
     const buffer = Buffer.from(base64Clean, 'base64');
     const fileExtension = base64Data.substring(base64Data.indexOf('/') + 1, base64Data.indexOf(';base64'));
     
-    // 生成按日期和类型分文件夹的路径
+    // 生成按日期和类型分文件夹的路径，使用本地时间
     const now = new Date();
-    const dateStr = now.toISOString().split('T')[0]; // 2024-12-10
-    const timeStr = now.toISOString().replace(/[:.]/g, '-').replace('T', 'T'); // 2024-12-10T15-30-45-123Z
+    // 使用本地时间而不是UTC时间
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`; // 2025-06-11
+    
+    // 生成本地时间戳
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
+    const timeStr = `${dateStr}T${hours}-${minutes}-${seconds}-${milliseconds}Z`;
     const shortId = uuidv4().substring(0, 8);
     
     // 文件路径：2024-12-10/uploaded/2024-12-10T15-30-45-123Z-a1b2c3d4.jpg
@@ -483,3 +493,8 @@ export async function POST(request: NextRequest) {
     }, { status: 500 })
   }
 }
+
+// 运行时配置，支持大文件上传和长时间运行
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60
