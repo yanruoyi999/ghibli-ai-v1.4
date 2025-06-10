@@ -13,7 +13,7 @@ const buildGhibliPrompt = (userPrompt: string) => {
 }
 
 // 将图片上传到 Cloudflare R2
-async function uploadImageToR2(base64Data: string): Promise<string> {
+async function uploadImageToR2(base64Data: string, imageType: 'uploaded' | 'generated' = 'uploaded'): Promise<string> {
   
   // 从环境变量中获取 R2 配置
   const accountId = process.env.R2_ACCOUNT_ID;
@@ -40,7 +40,15 @@ async function uploadImageToR2(base64Data: string): Promise<string> {
     const base64Clean = base64Data.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64Clean, 'base64');
     const fileExtension = base64Data.substring(base64Data.indexOf('/') + 1, base64Data.indexOf(';base64'));
-    const fileName = `${uuidv4()}.${fileExtension}`;
+    
+    // 生成按日期和类型分文件夹的路径
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0]; // 2024-12-10
+    const timeStr = now.toISOString().replace(/[:.]/g, '-').replace('T', 'T'); // 2024-12-10T15-30-45-123Z
+    const shortId = uuidv4().substring(0, 8);
+    
+    // 文件路径：2024-12-10/uploaded/2024-12-10T15-30-45-123Z-a1b2c3d4.jpg
+    const fileName = `${dateStr}/${imageType}/${timeStr}-${shortId}.${fileExtension}`;
 
     // 创建上传指令
     const command = new PutObjectCommand({
@@ -54,12 +62,45 @@ async function uploadImageToR2(base64Data: string): Promise<string> {
     await s3.send(command);
     const imageUrl = `${publicUrlBase}/${fileName}`;
     
-    console.log(`✅ 图片已成功上传到 R2: ${imageUrl}`);
+    console.log(`✅ 图片已成功上传到 R2 (${imageType}): ${imageUrl}`);
     return imageUrl;
     
   } catch (error: any) {
     console.error("❌ 调用 R2 服务时发生错误:", error);
     throw new Error(`图片上传至 Cloudflare R2 失败: ${error.message}`);
+  }
+}
+
+// 下载远程图片并上传到 R2
+async function downloadAndStoreToR2(imageUrl: string): Promise<string> {
+  try {
+    console.log(`🔄 开始下载并存储图片到 R2: ${imageUrl.substring(0, 100)}...`);
+    
+    // 1. 下载远程图片
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      throw new Error(`下载图片失败: ${response.status} ${response.statusText}`);
+    }
+    
+    const imageBuffer = await response.arrayBuffer();
+    console.log(`📥 图片下载完成，大小: ${(imageBuffer.byteLength / 1024 / 1024).toFixed(2)}MB`);
+    
+    // 2. 转换为base64格式
+    const base64 = Buffer.from(imageBuffer).toString('base64');
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    const dataUrl = `data:${contentType};base64,${base64}`;
+    
+    // 3. 上传到R2，标记为 generated 类型
+    const r2Url = await uploadImageToR2(dataUrl, 'generated');
+    console.log(`✅ 图片已成功存储到 R2: ${r2Url}`);
+    
+    return r2Url;
+    
+  } catch (error: any) {
+    console.error("❌ 下载并存储图片到 R2 失败:", error);
+    // 如果R2存储失败，返回原始URL作为降级方案
+    console.log("⚠️ 使用原始URL作为降级方案");
+    return imageUrl;
   }
 }
 
@@ -77,14 +118,6 @@ const getSizeFromAspectRatio = (aspectRatio: string): "1024x1024" | "1536x1024" 
 
 export async function POST(request: NextRequest) {
   try {
-    // 调试：检查请求头和域名信息
-    console.log("📡 API请求调试信息:");
-    console.log("  - req.headers.host:", request.headers.get('host'));
-    console.log("  - req.headers.origin:", request.headers.get('origin'));
-    console.log("  - req.headers.referer:", request.headers.get('referer'));
-    console.log("  - req.nextUrl.origin:", request.nextUrl.origin);
-    console.log("  - req.nextUrl.hostname:", request.nextUrl.hostname);
-    
     // 检查并获取请求体中的数据
     const { prompt, aspectRatio = "1:1", quality = "standard", input_image } = await request.json()
 
@@ -111,7 +144,7 @@ export async function POST(request: NextRequest) {
 
       console.log("接收到 input_image，尝试上传图片到 R2 并调用 Replicate API 进行图生图...");
       try {
-        imageUrlForApi = await uploadImageToR2(input_image);
+        imageUrlForApi = await uploadImageToR2(input_image, 'uploaded');
         console.log("图片上传成功，URL:", imageUrlForApi);
       } catch (uploadError: any) {
         console.error("❌ 图片上传流程失败:", uploadError.message);
@@ -241,10 +274,14 @@ export async function POST(request: NextRequest) {
 
       if (imageUrl) {
         console.log(`🎉 Replicate 图片生成完成: ${imageUrl.substring(0, 100)}...`)
+        
+        // 将生成的图片存储到 R2
+        const r2ImageUrl = await downloadAndStoreToR2(imageUrl);
+        
         const totalTime = Date.now() - startTime
         const responseData: any = {
           success: true,
-          imageUrl: imageUrl,
+          imageUrl: r2ImageUrl,
           message: "图片生成成功！",
           stats: {
             totalTime: `${totalTime}ms`,
@@ -320,40 +357,7 @@ export async function POST(request: NextRequest) {
         body: raw
       }
 
-             // 重试机制
-       let response: Response | undefined;
-       let lastError: Error | undefined;
-       const maxRetries = 3;
-      
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          console.log(`🔄 尝试第 ${attempt}/${maxRetries} 次调用 ismaque.org API...`);
-          
-          response = await fetch("https://ismaque.org/v1/images/generations", {
-            ...requestOptions,
-            signal: AbortSignal.timeout(30000) // 30秒超时
-          });
-          
-          // 如果请求成功，跳出重试循环
-          break;
-          
-        } catch (error: any) {
-          lastError = error;
-          console.error(`❌ 第 ${attempt} 次尝试失败:`, error.message);
-          
-          if (attempt < maxRetries) {
-            const waitTime = attempt * 2000; // 递增等待时间：2s, 4s
-            console.log(`⏳ 等待 ${waitTime/1000}s 后重试...`);
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-          }
-        }
-      }
-      
-                    // 如果所有重试都失败了
-        if (!response) {
-           console.error("❌ 所有重试尝试都失败了");
-          throw new Error(`API连接失败，已重试${maxRetries}次: ${lastError?.message || '未知错误'}`);
-         }
+      const response = await fetch("https://ismaque.org/v1/images/generations", requestOptions)
 
       const requestTime = Date.now() - startTime
       console.log(`⏱️ ismaque.org API请求耗时: ${requestTime}ms`)
@@ -448,9 +452,13 @@ export async function POST(request: NextRequest) {
 
       if (imageUrl) {
         console.log(`🎉 图片生成完成: ${imageUrl.substring(0, 100)}...`)
+        
+        // 将生成的图片存储到 R2
+        const r2ImageUrl = await downloadAndStoreToR2(imageUrl);
+        
         const responseData: any = {
           success: true,
-          imageUrl: imageUrl,
+          imageUrl: r2ImageUrl,
           message: "图片生成成功！",
           stats: {
             totalTime: `${requestTime}ms`,
