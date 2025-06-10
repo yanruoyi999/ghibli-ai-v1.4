@@ -346,7 +346,25 @@ export default function GhibliAI() {
   const downloadHistoryImage = async (e: React.MouseEvent<HTMLButtonElement>, image: GeneratedImage) => {
     e.stopPropagation();
     try {
-      const response = await fetch(image.url);
+      setDownloadStatus(prev => ({ ...prev, [image.id]: true }));
+      
+      // 通过本地API代理下载，避免CORS问题
+      const response = await fetch('/api/download', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageUrl: image.url,
+          fileName: `ghibli-ai-${image.id}.png`
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('下载失败');
+      }
+
+      // 创建下载链接
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -358,13 +376,26 @@ export default function GhibliAI() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       
-      setDownloadStatus(prev => ({ ...prev, [image.id]: true }));
       setTimeout(() => {
         setDownloadStatus(prev => ({ ...prev, [image.id]: false }));
       }, 2000);
 
     } catch (error) {
       console.error("下载历史图片失败:", error);
+      setDownloadStatus(prev => ({ ...prev, [image.id]: false }));
+      // 如果API下载失败，回退到直接打开链接的方式
+      try {
+        const a = document.createElement("a");
+        a.style.display = "none";
+        a.href = image.url;
+        a.download = `ghibli-ai-${image.id}.png`;
+        a.target = "_blank";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (fallbackError) {
+        console.error("回退下载方式也失败:", fallbackError);
+      }
     }
   };
 
