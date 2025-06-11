@@ -356,7 +356,7 @@ export async function POST(request: NextRequest) {
         "n": 1,
         "model": "flux-kontext-pro",
         "aspect_ratio": finalAspectRatio,
-        "webhook_url": "https://250601-v0-ghibli-aiwebsite-v1-3.vercel.app/api/webhook-callback",
+        "webhook_url": "https://ghibli-ai-v1-4.vercel.app/api/webhook-callback",
       }
 
       const raw = JSON.stringify(rawObject)

@@ -215,15 +215,10 @@ export default function GhibliAI() {
       setGenerationStatus("图片已发送，请求正在进行处理...")
       console.log("🌐 发送API请求...", requestBody);
       
-      // 🧪 测试模式：检查是否在自定义域名上，如果是则使用测试API
-      const isCustomDomain = window.location.hostname !== 'localhost' && !window.location.hostname.includes('vercel.app');
-      const isTestMode = isCustomDomain && (prompt || "").toLowerCase().includes('test');
-      
-      const apiEndpoint = isTestMode ? '/api/test-generate' : '/api/generate';
-      const apiUrl = `${window.location.origin}${apiEndpoint}`;
+      // 统一使用正式的生成API
+      const apiUrl = `${window.location.origin}/api/generate`;
       
       console.log("🔗 API请求URL:", apiUrl);
-      console.log("🧪 测试模式:", isTestMode ? "开启" : "关闭");
       console.log("🌐 当前域名:", window.location.hostname);
       
       const response = await fetch(apiUrl, {
